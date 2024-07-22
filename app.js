@@ -163,8 +163,9 @@ async function getLastUrlFromDatabase() {
 
 
 const scrapDataSites = () => {
-    const SCRAP_DATA = true;
+    let SCRAP_DATA = true;
     (async () => {
+        try {
         const lastUrl = await getLastUrlFromDatabase();
         console.log('Pages found:', lastUrl);
         if (SCRAP_DATA) {
@@ -172,46 +173,61 @@ const scrapDataSites = () => {
             const pages = await getPagesFromDomain(lastUrl);
             console.log('Pages found:', pages);
             var allIntents = [];
-            allIntents =allIntents.concat(customdata);
+            allIntents = allIntents.concat(customdata);
             for (const pageUrl of pages) {
                 const webData = await getWebData(pageUrl);
                 if (webData) {
                     const sanitizedData = sanitizeText(webData);
                     await saveScrapedData(pageUrl, sanitizedData); // Save sanitized data to a file (if needed)
-    
+
                     // Generate intents for this specific page's data
                     const pageIntents = await generateIntents(sanitizedData);
-                  
-                    allIntents =allIntents.concat(pageIntents);
-                    console.log("COncata : ",allIntents)
-                        
+
+                    allIntents = allIntents.concat(pageIntents);
+                    console.log("COncata : ", allIntents)
+
                 } else {
                     console.log(`Failed to fetch web data for ${pageUrl}.`);
                 }
             }
-            // Save all intents together after processing all pages
-        
-            saveIntents(allIntents)
-                .then(() => initializeNlpManager())
-                .catch(error => console.error('Error saving intents:', error));
-    
+
+            
+            await saveIntents(allIntents);
+            await initializeNlpManager();
         } else {
-            await initializeNlpManager(); // If not scraping, directly initialize and train NLP manager
+            await initializeNlpManager(); 
         }
+        pm2.restart('app', (err) => {
+            if (err) {
+                console.error('Error restarting application:', err);
+                // console.log('Application restarted successfully');
+            } else {
+                console.log('Application restarted successfully');
+            }
+        });
+    }catch (error) {
+        console.error('Error in scraping process:', error);
+        SCRAP_DATA = false; 
+    }
+
     })();
+
+
+    const { NlpManager } = require('node-nlp');
+    const fs = require('fs');
+    const path = require('path');
+
     async function initializeNlpManager() {
-        manager = new NlpManager({ languages: ['en'] });
+        const manager = new NlpManager({ languages: ['en'] });
         const intentsFile = path.join(__dirname, 'intents.json');
     
-        if (fs.existsSync(intentsFile)) {
-            const intentsContent = fs.readFileSync(intentsFile, 'utf8');
-    
-            console.log("content",intentsContent)
-            try {
-               
+        try {
+            if (fs.existsSync(intentsFile)) {
+                const intentsContent = fs.readFileSync(intentsFile, 'utf8');
                 const intents = JSON.parse(intentsContent);
+    
                 intents.forEach(intent => {
-                    if (intent.patterns && intent.responses) {
+                    if (intent.patterns && Array.isArray(intent.patterns) && intent.responses && Array.isArray(intent.responses)) {
                         intent.patterns.forEach(pattern => {
                             manager.addDocument('en', pattern, intent.tag);
                         });
@@ -219,21 +235,24 @@ const scrapDataSites = () => {
                             manager.addAnswer('en', intent.tag, response);
                         });
                     } else {
-                        console.error('Missing patterns or responses in intent:', intent);
+                        console.error('Invalid intent format found in intents.json:', intent);
                     }
                 });
-                console.log("Training Started")
+    
+                console.log('Training NLP manager...');
                 await manager.train();
                 console.log('NLP manager trained successfully.');
-            } catch (error) {
     
-                console.error('Error parsing intents JSON or training NLP manager:', error);
-                // console.log("And the intent is ",intent)
+                // Optionally save the model
+                manager.save();
+            } else {
+                console.error('Intents file does not exist:', intentsFile);
             }
-        } else {
-            console.error('Intents file does not exist:', intentsFile);
+        } catch (error) {
+            console.error('Error parsing intents JSON or training NLP manager:', error);
         }
     }
+    
 }
 
 async function initializeNlpManager() {

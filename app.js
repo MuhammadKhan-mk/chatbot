@@ -423,76 +423,74 @@ app.get('/info', (req, res) => {
 
 app.post('/v1/addnode', (req, res) => {
     const { id, data, position } = req.body;
-  
     if (!data || !data.label) {
-      return res.status(400).send('Invalid data format');
+        return res.status(400).send('Invalid data format');
     }
-  
+
     const sql = 'INSERT INTO nodes (id, label, positionX, positionY) VALUES (?, ?, ?, ?)';
     const values = [id, data.label, position.x, position.y];
-  
-    // Proceed with database operation
+
     db.query(sql, values, (err, result) => {
-      if (err) {
-        console.error('Error adding new node:', err);
-        return res.status(500).send('Failed to add new node');
-      }
-      console.log('New node added to database');
-      res.status(200).send('Node added successfully');
+        if (err) {
+            console.error('Error adding new node:', err);
+            return res.status(500).send('Failed to add new node');
+        }
+        console.log('New node added to database');
+        res.status(200).send('Node added successfully');
     });
-  });  
+});
 
 
 // GET endpoint to fetch all nodes
 app.get('/v1/getnodes', (req, res) => {
     const sql = 'SELECT * FROM nodes';
     db.query(sql, (err, results) => {
-      if (err) {
-        console.error('Error fetching nodes:', err);
-        return res.status(500).send('Failed to fetch nodes');
-      }
-      if (results.length === 0) {
-        return res.status(404).send('No nodes found');
-      }
-      res.status(200).json(results);
+        if (err) {
+            console.error('Error fetching nodes:', err);
+            return res.status(500).send('Failed to fetch nodes');
+        }
+        if (results.length === 0) {
+            return res.status(404).send('No nodes found');
+        }
+        res.status(200).json(results);
     });
-  });
-
-
-  app.post('/v1/addurl', (req, res) => {
-    if (req.method === 'POST') {
-        const { url } = req.body;
-        const sql = 'INSERT INTO scrap_data_site (url, timestamp) VALUES (?, CURRENT_TIMESTAMP)';
-        db.query(sql, [url], (error, results, fields) => {
-          if (error) {
-            console.error('Error inserting URL into database:', error);
-            res.status(500).json({ message: 'Failed to insert URL' });
-            return;
-          }
-
-          console.log('URL inserted successfully');
-          getLastUrlFromDatabase();
-          scrapDataSites();
-          res.status(200).json({ message: 'URL inserted successfully' });
-        });
-      } else {
-        res.status(405).json({ message: 'Method Not Allowed' });
-      }
 });
+
+
+    app.post('/v1/addurl', (req, res) => {
+        if (req.method === 'POST') {
+            const { url } = req.body;
+            const sql = 'INSERT INTO scrap_data_site (url, timestamp) VALUES (?, CURRENT_TIMESTAMP)';
+            db.query(sql, [url], (error, results, fields) => {
+                if (error) {
+                    console.error('Error inserting URL into database:', error);
+                    res.status(500).json({ message: 'Failed to insert URL' });
+                    return;
+                }
+
+                console.log('URL inserted successfully');
+                getLastUrlFromDatabase();
+                scrapDataSites();
+                
+                res.status(200).json({ message: 'URL inserted successfully', SCRAP_DATA });
+            });
+        } else {
+            res.status(405).json({ message: 'Method Not Allowed' });
+        }
+    });
 
 
 app.get('/api/scrap_data_site', (req, res) => {
     const sql = 'SELECT url, timestamp FROM scrap_data_site';
     db.query(sql, (error, results, fields) => {
-      if (error) {
-        console.error('Error fetching data:', error);
-        res.status(500).json({ error: 'Failed to fetch data' });
-      } else {
-        res.json(results); 
-      }
+        if (error) {
+            console.error('Error fetching data:', error);
+            res.status(500).json({ error: 'Failed to fetch data' });
+        } else {
+            res.json(results);
+        }
     });
-  });
-
+});
 
 app.listen(port, () => {
     console.log(`Server is running on port ${port}`);

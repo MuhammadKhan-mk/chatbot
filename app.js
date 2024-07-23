@@ -415,6 +415,80 @@ app.post('/chat', async (req, res) => {
     return res.status(200).json(customResponse);
 });
 
+// Add Manual Intent
+
+async function genrateautoIntents(patterns, responses) {
+    try {
+        const OpenAI = await import('openai');
+        const openai = new OpenAI.default({
+            apiKey: 'sk-proj-5lM6lJjWCaHfY4wlfYwgT3BlbkFJmNgbR2q5wit09nouxl4s',
+        });
+        let prompt = 'Based on the following data, generate extensive detailed and intelligent yet common intents for a chatbot in JSON format: as tag patterns and responses in json format, patterns should be extensive questions which user could ask\n\n' + patterns + responses;
+        const chatCompletions = await openai.chat.completions.create({
+            model: "gpt-3.5-turbo",
+            messages: [{ "role": "user", "content": prompt }],
+        });
+
+        const responseText = chatCompletions.choices[0].message.content;
+        const intents = JSON.parse(responseText).intents;
+
+        return intents;
+
+    } catch (error) {
+        console.error('Error calling OpenAI API:', error);
+        return [];
+    }
+}
+
+app.post('/api/addIntent', async (req, res) => {
+    const { tag, patterns, responses } = req.body;
+
+    if (!tag || !patterns || !responses || patterns.length !== responses.length) {
+        return res.status(400).json({ message: 'Invalid request body' });
+    }
+
+    let intents = [];
+
+    try {
+        intents = JSON.parse(fs.readFileSync('intents.json', 'utf8'));
+    } catch (error) {
+        console.error('Error reading intents.json:', error);
+        return res.status(500).json({ message: 'Error reading intents' });
+    }
+
+    // Create a new intent object
+    const newIntent = {
+        tag: tag,
+        patterns: patterns,
+        responses: responses
+    };
+
+    // Generate variations
+    const generatedVariations = await genrateautoIntents(patterns, responses);
+
+    // Add generated variations directly to intents array
+    intents.push(newIntent);
+    intents.push(...generatedVariations);
+
+    // Write intents back to intents.json file
+    fs.writeFile('intents.json', JSON.stringify(intents, null, 2), (err) => {
+        if (err) {
+            console.error('Error writing intents.json:', err);
+            return res.status(500).json({ message: 'Error saving intent' });
+        }
+        console.log('Intents added successfully:', newIntent);
+        res.json({ message: 'Intents added successfully' });
+
+        // Optionally restart the application if needed
+        pm2.restart('app', (err) => {
+            if (err) {
+                console.error('Error restarting application:', err);
+            } else {
+                console.log('Application restarted successfully');
+            }
+        });
+    });
+});
 
 async function getChatbotResponse(message) {
     const response = await manager.process('en', message);
@@ -533,7 +607,9 @@ app.delete('/api/deleteurl/:id', async (req, res) => {
                 }
             });
         });
-
+        var allIntents = [];
+        allIntents = allIntents.concat(customdata);
+        await saveIntents(allIntents);
         if (deletedUrl) {
             pm2.restart('app', (err) => {
                 if (err) {
@@ -598,6 +674,7 @@ async function deleteFromIntents(id) {
         return false;
     }
 }
+
 
 
 app.listen(port, () => {

@@ -500,7 +500,7 @@ app.get('/v1/getnodes', (req, res) => {
 
 
 app.get('/api/scrap_data_site', (req, res) => {
-    const sql = 'SELECT url, timestamp FROM scrap_data_site';
+    const sql = 'SELECT id, url, timestamp FROM scrap_data_site';
     db.query(sql, (error, results, fields) => {
         if (error) {
             console.error('Error fetching data:', error);
@@ -510,6 +510,95 @@ app.get('/api/scrap_data_site', (req, res) => {
         }
     });
 });
+
+
+// Delete Url and Url Intents
+
+app.delete('/api/deleteurl/:id', async (req, res) => {
+    const id = req.params.id;
+    const sql = 'DELETE FROM scrap_data_site WHERE id = ?';
+
+    try {
+        // Delete from intents array
+        const deletedUrl = await deleteFromIntents(id);
+ 
+        await new Promise((resolve, reject) => {
+            db.query(sql, [id], (error, results, fields) => {
+                if (error) {
+                    console.error('Error deleting record from database:', error);
+                    reject(error);
+                } else {
+                    console.log(`Deleted record with ID ${id} from scrap_data_site successfully`);
+                    resolve();
+                }
+            });
+        });
+
+        if (deletedUrl) {
+            pm2.restart('app', (err) => {
+                if (err) {
+                    console.error('Error restarting application:', err);
+                } else {
+                    console.log('Application restarted successfully');
+                }
+            });
+            res.status(200).json({ message: `Deleted record with ID ${id} successfully` });
+        } else {
+            res.status(500).json({ message: `Failed to delete record with ID ${id}` });
+        }
+    } catch (error) {
+        console.error('Error deleting record:', error);
+        res.status(500).json({ message: 'Failed to delete record' });
+    }
+});
+
+async function getUrlById(id) {
+    let connection;
+    try {
+      connection = await pool.getConnection();
+      const [rows, fields] = await connection.query('SELECT url FROM scrap_data_site WHERE id = ?', [id]);
+      if (rows.length > 0) {
+        return rows[0].url;
+      } else {
+        console.log(`URL with ID ${id} not found.`);
+        return null;
+      }
+    } catch (error) {
+      console.error('Error querying URL by ID:', error);
+      return null;
+    } finally {
+      if (connection) {
+        connection.release();
+      }
+    }
+  }
+
+  
+// Define allIntents globally to store all intents
+let allIntents = [];
+
+async function deleteFromIntents(id) {
+    try {
+        const urlToDelete = await getUrlById(id);
+        if (!urlToDelete) {
+            console.error(`URL with ID ${id} not found.`);
+            return false;
+        }
+
+        // Filter out intents associated with the deleted URL
+        allIntents = allIntents.filter(intent => intent.url !== urlToDelete);
+
+        // Save the updated intents
+        await saveIntents(allIntents);
+
+        console.log(`Deleted intents associated with URL ${urlToDelete} successfully`);
+        return true;
+    } catch (error) {
+        console.error('Error deleting intents:', error);
+        return false;
+    }
+}
+
 
 app.listen(port, () => {
     console.log(`Server is running on port ${port}`);

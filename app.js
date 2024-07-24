@@ -355,7 +355,7 @@ async function generateIntents(data) {
     try {
         const OpenAI = await import('openai');
         const openai = new OpenAI.default({
-            apiKey: 'sk-proj-Z9By0IzPs1UG8ESA17RsT3BlbkFJtbmLGfU08bV5anDSejoW',
+            apiKey: 'sk-svcacct-iJEIzFLomkRX1AXfzxppT3BlbkFJKQesbAN7C4fuBCupHN4E',
         });
 
         let prompt = 'Based on the following data, generate extensive detailed and intelligent yet common intents for a chatbot in JSON format: as tag patterns and responses in json format, patterns should be extensive questions which user could ask\n\n'+data;
@@ -421,7 +421,7 @@ async function genrateautoIntents(patterns, responses) {
     try {
         const OpenAI = await import('openai');
         const openai = new OpenAI.default({
-            apiKey: 'sk-proj-Z9By0IzPs1UG8ESA17RsT3BlbkFJtbmLGfU08bV5anDSejoW',
+            apiKey: 'sk-svcacct-iJEIzFLomkRX1AXfzxppT3BlbkFJKQesbAN7C4fuBCupHN4E',
         });
         let prompt = 'Based on the following data, generate extensive detailed and intelligent yet common intents for a chatbot in JSON format: as tag patterns and responses in json format, patterns should be extensive questions which user could ask\n\n' + patterns + responses;
         const chatCompletions = await openai.chat.completions.create({
